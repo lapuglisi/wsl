@@ -1,0 +1,90 @@
+#!/usr/bin/env ${SHELL}
+
+function wpath()
+{
+	target="$1";
+
+	# Is our environment ok?
+    if [ -z "${DEVENV_ROOT}" ];
+	then
+		echo "[wpath] DEVENV_ROOT is not defined.";
+		echo "Goodbye".
+
+		return 1;
+	fi
+
+	# What to translate?
+	if [ -z "${target}" ];
+	then
+		echo;
+		echo "usage:";
+		echo "    wpath WSL_DIR";
+		echo;
+		return 1;
+	fi
+	
+	# Is 'target' a valid directory?
+	if [ ! -d "${target}" ];
+	then
+		echo;
+		echo "[wpath] '${target}' is not a valid directory.";
+		echo;
+		return 1;
+	fi
+
+	dev_drive=$(echo "${DEVENV_ROOT}" | sed 's+/mnt/++');
+	wdir=$(echo "${target}" | sed "s+${DEVENV_ROOT}+${dev_drive}\:+");
+
+	echo "$wdir";
+}
+
+DEVENV_ROOT="$1";
+if [ -z "${DEVENV_ROOT}" ];
+then
+	if [ -n "${BASH_SOURCE}" ];
+	then
+		DEVENV_ROOT=`dirname "${BASH_SOURCE}"`;
+	else
+		# Fallback sem vergonha, mas eh o que tem.
+		DEVENV_ROOT=`pwd`;
+	fi
+fi
+
+
+DEVENV_WSLROOT=${DEVENV_ROOT}/WSL;
+DEVENV_SYSROOT=${DEVENV_ROOT}/System;
+DEVENV_SRCROOT=${DEVENV_ROOT}/Sources;
+DEVENV_APPROOT=${DEVENV_ROOT}/Applications;
+
+DEVENV_DRIVE=`echo "${DEVENV_ROOT}" | sed 's+/mnt/++'`;
+DEVENV_WIN_SYSROOT="${DEVENV_DRIVE}:\\System";
+DEVENV_WIN_WSLROOT="${DEVENV_DRIVE}:\\WSL";
+DEVENV_WIN_APPROOT="${DEVENV_DRIVE}:\\Applications";
+DEVENV_WIN_SRCROOT="${DEVENV_DRIVE}:\\Sources";
+
+export DEVENV_DRIVE;
+export DEVENV_ROOT;
+export DEVENV_WSLROOT;
+export DEVENV_SYSROOT;
+export DEVENV_SRCROOT;
+export DEVENV_APPROOT;
+export DEVENV_WIN_SYSROOT;
+export DEVENV_WIN_WSLROOT;
+export DEVENV_WIN_APPROOT;
+export DEVENV_WIN_SRCROOT;
+
+# Set some postgres stuff here
+export PGHOST=localhost
+export PGUSER=postgres
+
+if [ -d "${HOME}/.local/bin" ];
+then
+	export PATH="${PATH}:${HOME}/.local/bin";
+fi
+
+# Set default shell
+user_shell=$(grep $USER /etc/passwd | cut -d':' -f7);
+if [ "${user_shell}" != "$SHELL" ];
+then
+	exec ${user_shell} -l;
+fi

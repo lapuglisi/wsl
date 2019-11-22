@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+
+SRVMTSOLDEV_IP="192.168.100.50";
+SRVMTSOLHML_IP="192.168.100.52";
+
+function wslnsh-getproxy()
+{
+	local netsh=`which netsh.exe`;
+	if [ $? -ne 0 ];
+	then
+		echo;
+		echo "[ERROR] netsh.exe not found.";
+		echo;
+		return 1;
+	fi
+
+	${netsh} interface portproxy show v4tov4;
+}
+
+function wslnsh-addproxy()
+{
+	# v1: show something if the user needs help
+	case "$1" in
+	"-h"|"--help"|"help")
+		echo;
+		echo "usage:";
+		echo "    netsh-addproxy LISTEN_PORT {dev | hml | wsl | local | TARGET_HOST} [TARGET_PORT]";
+		echo;
+		return 0;
+	;;
+	
+	*)
+	;;
+	esac
+
+	local powershell=`which powershell.exe`;
+	if [ $? -ne 0 ];
+	then
+		echo;
+		echo "[ERROR] netsh.exe or powershell.exe not found.";
+		echo;
+		return 1;
+	fi
+
+	local default_source="0.0.0.0";
+	local source_host=;
+	read "source_host?Source host (${default_source}): ";
+	[[ -z "${source_host}" ]] && source_host="${default_source}";
+
+	local listen_port="$1";
+	local target_host="$2";
+
+	[[ -n "$3" ]] && target_port="$3";
+
+	if [ -z "${listen_port}" ];
+	then
+		read "listen_port?Listen on port: ";
+	fi
+
+	if [ -z "${target_host}" ];
+	then
+		read "target_host?Target host: ";
+	fi
+	
+	################################
+	# Test for predefined hosts
+	################################
+	case "${target_host}" in
+	"dev")
+		echo "[netsh] Using IP '${SRVMTSOLDEV_IP}' for alias '${target_host}'";
+		target_host="${SRVMTSOLDEV_IP}";
+	;;
+	
+	"hml")
+		echo "[netsh] Using IP '${SRVMTSOLHML_IP}' for alias '${target_host}'";
+		target_host="${SRVMTSOLHML_IP}";
+	;;
+	
+	"wsl")
+		local wsl_host_ip="$(ip address show dev eth0 | grep -Po 'inet\s+\K[\d.]+')";
+		echo "[netsh] Using IP '${wsl_host_ip}' for alias '${target_host}'";
+		target_host="${wsl_host_ip}";
+	;;
+	
+	"local")
+		echo "[netsh] Using IP '127.0.0.1' for alias '${target_host}'";
+		target_host="127.0.0.1";
+	;;
+	
+	*)
+		echo "[netsh] Using target host: '${target_host}'";
+	;;
+	esac
+
+	if [ -z "${target_port}" ];
+	then
+		read "target_port?Target Port (${listen_port}): ";
+		[[ -z "${target_port}" ]] && target_port=${listen_port};
+	fi
+
+	echo;
+	echo "Adding portproxy: ${source_host}:${listen_port} ==> ${target_host}:${target_port}";
+
+	local netsh_args="interface portproxy add v4tov4 \
+	listenaddress=${source_host} \
+	connectport=${target_port} \
+	listenport=${listen_port} \
+	connectaddress=${target_host}";
+
+	${powershell} -Command "& { Start-Process netsh.exe -ArgumentList \"${netsh_args}\" -Verb RunAs }";
+	
+}
+
+
+function wslnsh-delproxy()
+{
+	local powershell=`which powershell.exe`;
+	if [ $? -ne 0 ];
+	then
+		echo;
+		echo "[ERROR] powershell.exe not found.";
+		echo;
+		return 1;
+	fi
+	
+	local listen_port="$1";
+	if [ -z "${listen_port}" ];
+	then
+		read "listen_port?Listen port: ";
+	fi
+
+	local default_source="0.0.0.0";
+	local source_host=;
+	read "source_host?Source host (${default_source}): ";
+	[[ -z "${source_host}" ]] && source_host="${default_source}";
+
+	echo;
+	echo "Deleting portproxy: ${source_host}:${listen_port}";
+
+	local netsh_args="interface portproxy del v4tov4 \
+	listenaddress=${source_host} \
+	listenport=${listen_port}";
+
+	${powershell} -Command "& { Start-Process netsh.exe -ArgumentList \"${netsh_args}\" -Verb RunAs }";	
+}

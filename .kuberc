@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+
+# Configures KUBECONFIG
+if [ -n "${DEVENV_SYSROOT}" ];
+then
+	k8s_home="${DEVENV_SYSROOT}/Kubernetes";
+	kube_home="${k8s_home}/.kube";
+
+	KUBECONFIG="${kube_home}/config";
+
+	[[ ! -d "${kube_home}" ]] && mkdir -p "${kube_home}";
+
+	unset k8s_home;
+	unset kube_home;
+
+	export KUBECONFIG;
+else
+	echo;
+	echo "[kuberc] ERROR: DEVENV_SYSROOT is not defined.";
+	echo;
+fi
+
+
+# Kubernetes related
+function k8s-shell()
+{
+	local kubectl=`which kubectl`;
+
+	local k8resource="$1";
+	local k8shell="bash";
+	local k8container="$3";
+	
+	if [ -z "${k8resource}" ];
+	then
+		echo;
+		echo "usage:";
+		echo "    k8s-shell RESOURCE_SPEC [SHELL] [CONTAINER]";
+		echo;
+		return 1;
+	fi
+	
+	if [ -n "$2" ];
+	then
+		if [ "$2"=="-" ];
+		then
+			k8shell="${SHELL}";
+		else
+			k8shell="$2";
+		fi
+	fi
+	
+	if [ -n "${k8container}" ];
+	then
+		${kubectl} exec -it ${k8resource} -c ${k8container} -- ${k8shell};
+	else
+		${kubectl} exec -it ${k8resource} -- ${k8shell};
+	fi
+}
+
+
+function k8s-gui()
+{
+	local ssh_display="host.docker.internal:0.0";
+
+	local ssh_default_user="lapuglisi";
+	local ssh_user="$1";
+	
+	local ssh_default_port="22";
+	local ssh_port="$2";
+	
+	local ssh_default_launch="xfce4-terminal";
+	local ssh_launch="$3";
+	
+	if [ -z "${ssh_user}" ];
+	then
+		read "ssh_user?User (${ssh_default_user}): ";
+		[[ -z "${ssh_user}" ]] && ssh_user=$ssh_default_user;
+	fi
+	
+	if [ -z "${ssh_port}" ];
+	then
+		read "ssh_port?Port ($ssh_default_port): ";
+		[[ -z "${ssh_port}" ]] && ssh_port=$ssh_default_port;
+	fi
+	
+	if [ -z "${ssh_launch}" ];
+	then
+		read "ssh_launch?Launch ($ssh_default_launch): ";
+		[[ -z "${ssh_launch}" ]] && ssh_launch=$ssh_default_launch;
+	fi
+	
+	echo;
+	echo ">> I'm about to:";
+	echo "| Connect to localhost on port ${ssh_port} as '${ssh_user}' ..";
+	echo "| and export DISPLAY=${ssh_display} ..";
+	echo "| and launch ${ssh_launch} on the remote machine.";
+	echo;
+	ssh -l ${ssh_user} -p ${ssh_port} localhost "DISPLAY=${ssh_display} ${ssh_launch} &";
+}
+
