@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+if [ -z "${MTSOL_HOME}" ];
+then
+    echo;
+    echo -e "\033[31m A variavel MTSOL_HOME nao esta definida. \033[0m";
+fi
+
+########################################
+## Globais
+########################################
+MTSOL_GERENCIADOR="mtGerenciador";
+
+while [ 1 ];
+do
+	action=$(
+		dialog --no-kill --stdout --menu \
+		"MTSOL Control v1.0" 30 80 5 \
+		start  "start  - Inicia o servico MTSOL" \
+		stop   "stop   - Finaliza o servico MTSOL" \
+		tail   "tail   - Visualiza os logs do MTSOL" \
+		deploy "deploy - instala um novo pacote do MTSOL em ${MTSOL_HOME}/bin" \
+		quit   "quit   - sai do MTSOL Control"
+		);
+
+	[[ $? -ne 0 ]] && break;
+
+	case "${action}" in
+	"start")
+		echo "Iniciando MTSOL...";
+	;;
+
+	"stop")
+		echo "Finalizando MTSOL...";
+	;;
+
+	"tail")
+		echo "Tailando MTSOL...";
+	;;
+
+	"deploy")
+		echo "Deployando MTSOL";
+	;;
+
+	"quit")
+		break;
+	;;
+	esac
+
+	read;
+done
