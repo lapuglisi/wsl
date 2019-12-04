@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+if [ -z "${MTSOL_HOME}" ];
+then
+    echo;
+    echo -e "\033[31m A variavel MTSOL_HOME nao esta definida. \033[0m";
+fi
+
+########################################
+## Globais
+########################################
+MTSOL_GERENCIADOR="mtGerenciador";
+
+########################################
+## Functions
+########################################
+function mtlog_file()
+{
+    echo "${MTSOL_HOME}/log/MTL_`date +'%Y%m%d_%H00'`.log";
+}
+
+function mtsol_start()
+{
+    echo -e "\033[32m Iniciando MTSOL...\033[0m";
+
+    local current_pid=$(pidof ${MTSOL_GERENCIADOR});
+
+    if [ ! -z "${current_pid}" ];
+    then
+	echo "MTSOL ja esta em execucao com PID ${current_pid}";
+	echo "Vou nessa.";
+	return 1;
+    fi
+}
+
+_action="$1";
+
