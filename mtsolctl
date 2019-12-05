@@ -100,8 +100,35 @@ function mtsol_strace()
 		--programbox "strace - ${mtsol_pid}" 40 120
 }
 
+function show_start_menu()
+{
+	dialog --colors --no-kill --stdout --menu \
+		"${MTSOL_CONTROL_TITLE}" 30 100 ${MTSOL_TOTAL_OPTIONS} \
+		"${MTSOL_DIALOG_OPTIONS[@]}"
+}
+
+function mtsol_strace()
+{
+	(
+		## Aqui o usuario pode escolher o processo que deseja stracear
+		local mtsol_pid=$(ps -C ${MTSOL_GERENCIADOR} --no-headers -o pid);
+		
+		if [ -z "${mtsol_pid}" ];
+		then
+			echo;
+			echo "\Z1O modulo ${MTSOL_GERENCIADOR} nao esta em execucao.\Zn";
+			echo;
+		else
+			strace -p ${mtsol_pid};
+		fi
+	) | 
+	dialog --colors --title "strace - ${mtsol_pid}" \
+		--programbox "strace - ${mtsol_pid}" -1 -1
+}
+
 function mtlog_tail()
 {
+<<<<<<< HEAD
 	mtsol_log=`mtlog_file`;
 
 	if [ ! -f "${mtsol_log}" ];
@@ -113,6 +140,10 @@ function mtlog_tail()
 
     ${DIALOG} --backtitle "${mtsol_log}" --title "${mtsol_log}" \
        --tailbox "${mtsol_log}" 0 0;
+=======
+    dialog --backtitle `mtlog_file` --title `mtlog_file` \
+       --tailbox /var/log/pacman.log 0 0;
+>>>>>>> 6741a27251daeaabb7bc9dbc59d2e5f5d684212a
 }
 
 function mtsol_start()
