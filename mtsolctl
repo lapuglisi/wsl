@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 trap "say_goodbye;" 2 9 12 15
 
+export DIALOGRC="`dirname $0`/dialog.rc";
+
 if [ -z "${MTSOL_HOME}" ];
 then
     echo;
@@ -13,29 +15,35 @@ fi
 MTSOL_CONTROL_EDITION="Gavioes da Fiel";
 MTSOL_CONTROL_TITLE="MTSOL Control v1.0 - ${MTSOL_CONTROL_EDITION} Edition";
 MTSOL_GERENCIADOR="mtGerenciador";
-MTSOL_PROCESS_GREP="(mtGerenciador|mtTMSol|mtProcesso|mtPComMaq|mtPWSSol|mtPLog)"
+MTSOL_PROCESS_LIST="mtGerenciador,mtTMSol,mtProcesso,mtPComMaq,mtPWSSol,mtPLog,sra_sinc_base,stn_sinc_base,efc_sinc_base";
 
-MTSOL_CONTROL_ACTIONS="
-start       'start        - Inicia o servico MTSOL'
-stop        'stop         - Finaliza o servico MTSOL'
-tail        'tail         - Visualiza os logs do MTSOL'
-tail-other  'tail-other   - Visualiza outros logs do MTSOL'
-strace      'strace       - Inicia o trace do ${MTSOL_GERENCIADOR}''
-deploy      'deploy       - Instala um novo pacote do MTSOL em ${MTSOL_HOME}/bin'
-quit        'quit         - Sai do MTSOL Control'"
+MTSOL_DIALOG_OPTIONS=(
+start       "start        - Inicia o servico MTSOL",
+stop        "stop         - Finaliza o servico MTSOL",
+tail        "tail         - Visualiza os logs do MTSOL",
+tail-other  "tail-other   - Visualiza outros logs do MTSOL",
+strace      "strace       - Inicia o trace do ${MTSOL_GERENCIADOR}",
+deploy      "deploy       - Instala um novo pacote do MTSOL em ${MTSOL_HOME}/bin",
+quit        "quit         - Sai do MTSOL Control"
+);
+MTSOL_TOTAL_OPTIONS=7;
 
-MTSOL_CONTROL_ACTIONS_TOTAL=$(echo "${MTSOL_CONTROL_ACTIONS}" | wc -l);
+DIALOG=`which dialog`
+DIALOG_ARGS="--colors --backtitle \"${MTSOL_CONTROL_TITLE}\" --title \"${MTSOL_CONTROL_TITLE}\"";
 
 ########################################
 ## Functions
 ########################################
-alias mtlog_file='"${MTSOL_HOME}/log/MTL_`date +%Y_%m_%d_%H00`.log"';
+function mtlog_file()
+{
+	echo "${MTSOL_HOME}/log/MTL_`date +%Y_%m_%d_%H00`.log";
+}
 
 function say_goodbye()
 {
-	dialog --clear --timeout 10 --colors --ok-label "Eu que agradeço !" \
+	dialog --timeout 10 --colors --ok-label "Eu que agradeço !" \
 		--backtitle "${MTSOL_CONTROL_TITLE}" \
-		--msgbox "\Z5Obrigado por usar o ${MTSOL_CONTROL_TITLE}\Zn" 20 50;
+		--msgbox "Obrigado por usar o ${MTSOL_CONTROL_TITLE}" 10 75;
 
 	clear;
 	exit 0;
@@ -43,7 +51,7 @@ function say_goodbye()
 
 function show_error()
 {
-	dialog --clear --timeout 10 --colors --ok-label "Paciência..." \
+	dialog --timeout 10 --colors --ok-label "Paciência..." \
 		--backtitle "${MTSOL_CONTROL_TITLE}" \
 		--msgbox "\Zr\Z1Oxi: $1\Zn" 20 50;
 
@@ -54,13 +62,57 @@ function show_error()
 function show_gauge()
 {
 	dialog --timeout 2 --colors --backtitle "${MTSOL_CONTROL_TITLE}" \
-		--gauge "$1" 30 120 0;
+		--gauge "$1" 40 150;
+}
+
+function show_start_menu()
+{	
+	${DIALOG} --backtitle "${MTSOL_CONTROL_TITLE}" --title "${MTSOL_CONTROL_TITLE}" --no-kill --stdout \
+	--menu \
+	"Selecione o comando abaixo" 30 100 ${MTSOL_TOTAL_OPTIONS} \
+	"${MTSOL_DIALOG_OPTIONS[@]}"
+}
+
+function mtsol_strace()
+{
+	STRACE=`which strace`;
+	if [ $? -ne 0 ];
+	then
+		${DIALOG} --colors --title "${MTSOL_CONTROL_TITLE}" \
+		--msgbox "\Z1O pacote 'strace' nao esta instalado nessa maquina.\Zn" 20 50;
+		return 0;
+	fi
+
+	(
+		## Aqui o usuario pode escolher o processo que deseja stracear
+		local mtsol_pid=$(ps -C ${MTSOL_PROCESS_LIST} --no-headers -o pid,args);
+		
+		if [ -z "${mtsol_pid}" ];
+		then
+			echo;
+			echo "O modulo ${MTSOL_GERENCIADOR} nao esta em execucao.";
+			echo;
+		else
+			sudo ${STRACE} -p ${mtsol_pid};
+		fi
+	) 2>&1 | 
+	${DIALOG} --input-fd 2 --title "strace - ${mtsol_pid}" \
+		--programbox "strace - ${mtsol_pid}" 40 120
 }
 
 function mtlog_tail()
 {
-    dialog --backtitle "${MTSOL_CONTROL_TITLE}" \
-       --tailbox mtllog_file 0 0;
+	mtsol_log=`mtlog_file`;
+
+	if [ ! -f "${mtsol_log}" ];
+	then
+		dialog --colors --backtitle "${MTSOL_CONTROL_TITLE}" --title "${MTSOL_CONTROL_TITLE}" \
+			--msgbox "\n\Z1O arquivo '${mtsol_log}' nao foi encontrado.\Zn" 10 80;
+		return 1;
+	fi
+
+    ${DIALOG} --backtitle "${mtsol_log}" --title "${mtsol_log}" \
+       --tailbox "${mtsol_log}" 0 0;
 }
 
 function mtsol_start()
@@ -75,7 +127,7 @@ function mtsol_start()
 			echo "XXX"; # Dialog's trick - begin
 			echo "\Zr\Z4Inicializando MTSOL (${percent}%)...\Zn";
 			echo;
-			ps_output=$(ps -ef | grep --color=never -E "${MTSOL_PROCESS_GREP}" | grep -v "grep");
+			ps_output=$(ps -eH -C ${MTSOL_PROCESS_LIST} --no-headers -o pid,user,args);
 			echo $"\Z1${ps_output}\Zn";
 			echo "XXX"; # Dialog's trick - begin
 
@@ -100,28 +152,22 @@ function mtsol_stop()
     # sends the result to the gauge dialog
     local percent=0;
     (
-	
-	while [ ${percent} -lt 100 ]
-	do
-		echo "${percent}";
-		echo "XXX"; # Magica do dialog - begin
-		echo "Finalizando MTSOL (${percent}%)...";
-		echo "XXX"; # Magica do dialog - end
+		while [ ${percent} -lt 100 ]
+		do
+			echo "${percent}";
+			echo "XXX"; # Magica do dialog - begin
+			echo "Finalizando MTSOL (${percent}%)...";
+			echo "XXX"; # Magica do dialog - end
 
-		percent=$((percent + 10));
-		sleep 1;
-	done
-
+			percent=$((percent + 10));
+			sleep 1;
+		done
     ) | show_gauge "Finalizando MTSOL";
 }
 
 while [ 1 ];
 do
-    action=$(
-		dialog --colors --no-kill --stdout --menu \
-		"${MTSOL_CONTROL_TITLE}" 30 100 ${MTSOL_CONTROL_ACTIONS_TOTAL} \
-		${MTSOL_CONTROL_ACTIONS}
-    );
+    action=$(show_start_menu);
 	retcode=$?;
 
     if [ ${retcode} -ne 0 ];
@@ -130,22 +176,30 @@ do
 		break;
 	fi
 
-    case "${action}" in
+	case "${action}" in
 	"start")
-	    mtsol_start;
+		mtsol_start;
 	;;
 
 	"stop")
-	    mtsol_stop;
+		mtsol_stop;
 	;;
 
 	"tail")
-	    mtlog_tail;
+		mtlog_tail;
+	;;
+
+	"tail-other")
+		mtlog_tail;
 	;;
 
 	"deploy")
-	    dialog --backtitle "${MTSOL_CONTROL_TITLE}" \
+		dialog --backtitle "${MTSOL_CONTROL_TITLE}" \
 			--fselect "${MTSOL_HOME}" 0 0;
+	;;
+
+	"strace")
+		mtsol_strace;
 	;;
 
 	"quit")
