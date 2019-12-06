@@ -17,16 +17,27 @@ MTSOL_CONTROL_TITLE="MTSOL Control v1.0 - ${MTSOL_CONTROL_EDITION} Edition";
 MTSOL_GERENCIADOR="mtGerenciador";
 MTSOL_PROCESS_LIST="mtGerenciador,mtTMSol,mtProcesso,mtPComMaq,mtPWSSol,mtPLog,sra_sinc_base,stn_sinc_base,efc_sinc_base";
 
+#### Comandos do menu
+MTSOL_MENU_START="start";
+MTSOL_MENU_STOP="stop";
+MTSOL_MENU_TAIL="tail";
+MTSOL_MENU_TAILOTHER="tail-other";
+MTSOL_MENU_STRACE="strace";
+MTSOL_MENU_DEPLOY="deploy";
+MTSOL_MENU_QUIT="quit";
+
 MTSOL_DIALOG_OPTIONS=(
-start       "start        - Inicia o servico MTSOL",
-stop        "stop         - Finaliza o servico MTSOL",
-tail        "tail         - Visualiza os logs do MTSOL",
-tail-other  "tail-other   - Visualiza outros logs do MTSOL",
-strace      "strace       - Inicia o trace do ${MTSOL_GERENCIADOR}",
-deploy      "deploy       - Instala um novo pacote do MTSOL em ${MTSOL_HOME}/bin",
-quit        "quit         - Sai do MTSOL Control"
+${MTSOL_MENU_START}       "${MTSOL_MENU_START}        - Inicia o servico MTSOL",
+${MTSOL_MENU_STOP}        "${MTSOL_MENU_STOP}         - Finaliza o servico MTSOL",
+${MTSOL_MENU_TAIL}        "${MTSOL_MENU_TAIL}         - Visualiza os logs do MTSOL",
+${MTSOL_MENU_TAILOTHER}   "${MTSOL_MENU_TAILOTHER}    - Visualiza outros logs do MTSOL",
+${MTSOL_MENU_STRACE}      "${MTSOL_MENU_STRACE}       - Inicia o trace do ${MTSOL_GERENCIADOR}",
+${MTSOL_MENU_DEPLOY}      "${MTSOL_MENU_DEPLOY}       - Instala um novo pacote do MTSOL em ${MTSOL_HOME}/bin",
+${MTSOL_MENU_QUIT}        "${MTSOL_MENU_QUIT}         - Sai do MTSOL Control"
 );
 MTSOL_TOTAL_OPTIONS=7;
+
+MSGBOX_SIZE=(15 100);
 
 DIALOG=`which dialog`
 DIALOG_ARGS="--colors --backtitle \"${MTSOL_CONTROL_TITLE}\" --title \"${MTSOL_CONTROL_TITLE}\"";
@@ -41,7 +52,7 @@ function mtlog_file()
 
 function say_goodbye()
 {
-	dialog --timeout 10 --colors --ok-label "Eu que agradeço !" \
+	${DIALOG} --timeout 10 --colors --ok-label "Eu que agradeço !" \
 		--backtitle "${MTSOL_CONTROL_TITLE}" \
 		--msgbox "Obrigado por usar o ${MTSOL_CONTROL_TITLE}" 10 75;
 
@@ -51,26 +62,33 @@ function say_goodbye()
 
 function show_error()
 {
-	dialog --timeout 10 --colors --ok-label "Paciência..." \
+	${DIALOG} --timeout 10 --colors --ok-label "Paciência..." \
 		--backtitle "${MTSOL_CONTROL_TITLE}" \
-		--msgbox "\Zr\Z1Oxi: $1\Zn" 20 50;
+		--msgbox "\Z1$1\Zn" ${MSGBOX_SIZE[@]};
 
 	clear;
 	exit 1;
 }
 
+function show_msgbox()
+{
+	${DIALOG} --stdout --timeout 10 --clear --colors --ok-label " Suave " \
+		--backtitle "${MTSOL_CONTROL_TITLE}" \
+		--msgbox "$1" ${MSGBOX_SIZE[@]};
+}
+
 function show_gauge()
 {
-	dialog --timeout 2 --colors --backtitle "${MTSOL_CONTROL_TITLE}" \
+	${DIALOG} --timeout 2 --colors --backtitle "${MTSOL_CONTROL_TITLE}" \
 		--gauge "$1" 40 150;
 }
 
 function show_start_menu()
 {	
 	${DIALOG} --backtitle "${MTSOL_CONTROL_TITLE}" --title "${MTSOL_CONTROL_TITLE}" --no-kill --stdout \
-	--menu \
-	"Selecione o comando abaixo" 30 100 ${MTSOL_TOTAL_OPTIONS} \
-	"${MTSOL_DIALOG_OPTIONS[@]}"
+		--menu \
+		"Selecione o comando abaixo" 30 100 ${MTSOL_TOTAL_OPTIONS} \
+		"${MTSOL_DIALOG_OPTIONS[@]}"
 }
 
 function mtsol_strace()
@@ -78,72 +96,75 @@ function mtsol_strace()
 	STRACE=`which strace`;
 	if [ $? -ne 0 ];
 	then
-		${DIALOG} --colors --title "${MTSOL_CONTROL_TITLE}" \
-		--msgbox "\Z1O pacote 'strace' nao esta instalado nessa maquina.\Zn" 20 50;
+		show_error "O pacote 'strace' não está instalado nessa máquina.";
 		return 0;
 	fi
 
+	####
+	# Bloco de output para o programbox
+	###
 	(
 		## Aqui o usuario pode escolher o processo que deseja stracear
-		local mtsol_pid=$(ps -C ${MTSOL_PROCESS_LIST} --no-headers -o pid,args);
-		
+		local mtsol_pid=$(ps -u ${USER} --no-headers -o pid | head -1);
+
 		if [ -z "${mtsol_pid}" ];
 		then
 			echo;
 			echo "O modulo ${MTSOL_GERENCIADOR} nao esta em execucao.";
 			echo;
 		else
-			sudo ${STRACE} -p ${mtsol_pid};
+			${STRACE} -p ${mtsol_pid} 2>&1;
 		fi
 	) 2>&1 | 
-	${DIALOG} --input-fd 2 --title "strace - ${mtsol_pid}" \
-		--programbox "strace - ${mtsol_pid}" 40 120
+	${DIALOG} --stdout --title "strace - ${mtsol_pid}" \
+		--programbox "strace - ${mtsol_pid}" 0 0
 }
 
 function show_start_menu()
 {
-	dialog --colors --no-kill --stdout --menu \
+	${DIALOG} --colors --no-kill --stdout --menu \
 		"${MTSOL_CONTROL_TITLE}" 30 100 ${MTSOL_TOTAL_OPTIONS} \
 		"${MTSOL_DIALOG_OPTIONS[@]}"
 }
 
-function mtsol_strace()
-{
-	(
-		## Aqui o usuario pode escolher o processo que deseja stracear
-		local mtsol_pid=$(ps -C ${MTSOL_GERENCIADOR} --no-headers -o pid);
-		
-		if [ -z "${mtsol_pid}" ];
-		then
-			echo;
-			echo "\Z1O modulo ${MTSOL_GERENCIADOR} nao esta em execucao.\Zn";
-			echo;
-		else
-			strace -p ${mtsol_pid};
-		fi
-	) | 
-	dialog --colors --title "strace - ${mtsol_pid}" \
-		--programbox "strace - ${mtsol_pid}" -1 -1
-}
-
 function mtlog_tail()
 {
-<<<<<<< HEAD
-	mtsol_log=`mtlog_file`;
+	choose_time="$1";	
+	mtsol_log="";
+
+	# 
+	if [ $1 -eq 1 ];
+	then
+		log_time=$(
+			${DIALOG} --stdout --clear --visit-items \
+			--title "Escolha a hora do log." \
+			--timebox "Escolha a hora do log." 0 0 \
+				`date +%H` 0 0);
+
+		[[ $? -ne 0 ]] && return 1;
+
+		log_time=$(echo "${log_time}" | cut -d':' -f1);
+		mtsol_log="${MTSOL_HOME}/log/MTL_`date +%Y_%m_%d`_${log_time}00.log";
+	else
+		mtsol_log=`mtlog_file`;
+	fi
 
 	if [ ! -f "${mtsol_log}" ];
 	then
-		dialog --colors --backtitle "${MTSOL_CONTROL_TITLE}" --title "${MTSOL_CONTROL_TITLE}" \
-			--msgbox "\n\Z1O arquivo '${mtsol_log}' nao foi encontrado.\Zn" 10 80;
+		show_error "O arquivo '${mtsol_log}' não foi encontrado.";
 		return 1;
 	fi
 
     ${DIALOG} --backtitle "${mtsol_log}" --title "${mtsol_log}" \
        --tailbox "${mtsol_log}" 0 0;
-=======
-    dialog --backtitle `mtlog_file` --title `mtlog_file` \
-       --tailbox /var/log/pacman.log 0 0;
->>>>>>> 6741a27251daeaabb7bc9dbc59d2e5f5d684212a
+}
+
+function mtsol_deploy()
+{
+	local deploy_file=$(
+		${DIALOG} --backtitle "${MTSOL_CONTROL_TITLE}" \
+		--dselect "${HOME}" 0 0;
+	);
 }
 
 function mtsol_start()
@@ -168,7 +189,7 @@ function mtsol_start()
 
 		echo "100";
 		echo "XXX";
-		echo -e "\Zr\Z2--- MTSOL esta no ar! ---\Zn";
+		echo -e "\Z2--- MTSOL esta no ar! ---\Zn";
 		echo;
 		echo "Pressione qualquer tecla para continuar.";
 		echo "XXX";
@@ -187,13 +208,25 @@ function mtsol_stop()
 		do
 			echo "${percent}";
 			echo "XXX"; # Magica do dialog - begin
-			echo "Finalizando MTSOL (${percent}%)...";
+			echo "\Z1Finalizando MTSOL (${percent}%)...\Zn";
+			echo;
+			ps_output=$(ps -eH -u "${USER}" -o pid,args);
+			echo ${ps_output};
 			echo "XXX"; # Magica do dialog - end
 
 			percent=$((percent + 10));
 			sleep 1;
 		done
+
+		echo "100";
+		echo "XXX";
+		echo -e "\Z1--- MTSOL finalizado. ---\Zn";
+		echo;
+		echo "Pressione qualquer tecla para continuar.";
+		echo "XXX";
     ) | show_gauge "Finalizando MTSOL";
+
+	read;
 }
 
 while [ 1 ];
@@ -208,32 +241,31 @@ do
 	fi
 
 	case "${action}" in
-	"start")
+	"${MTSOL_MENU_START}")
 		mtsol_start;
 	;;
 
-	"stop")
+	"${MTSOL_MENU_STOP}")
 		mtsol_stop;
 	;;
 
-	"tail")
+	"${MTSOL_MENU_TAIL}")
 		mtlog_tail;
 	;;
 
-	"tail-other")
-		mtlog_tail;
+	"${MTSOL_MENU_TAILOTHER}")
+		mtlog_tail 1;
 	;;
 
-	"deploy")
-		dialog --backtitle "${MTSOL_CONTROL_TITLE}" \
-			--fselect "${MTSOL_HOME}" 0 0;
+	"${MTSOL_MENU_DEPLOY}")
+		mtsol_deploy;
 	;;
 
-	"strace")
+	"${MTSOL_MENU_STRACE}")
 		mtsol_strace;
 	;;
 
-	"quit")
+	"${MTSOL_MENU_QUIT}")
 		break;
 	;;
 
